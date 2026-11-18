@@ -18,8 +18,8 @@
 </head>
 <body>
 <div id="start-screen"><h2>Ekranni bosing 💙</h2></div>
-<!-- Ed Sheeran - Perfect mp3 faylini shu index.html yoniga perfect.mp3 nomi bilan qo'ying. Faqat 15 soniya chalinadi -->
-<audio id="bgMusic" preload="auto"><source src="perfect.mp3" type="audio/mpeg"></audio>
+<!-- Ed Sheeran - Perfect mp3 faylini shu index.html yoniga shu nom bilan qo'ying. Faqat 15 soniya chalinadi -->
+<audio id="bgMusic" preload="auto"><source src="Ed_Sheeran_-_PERFECT_SHORT_68776065.mp3" type="audio/mpeg"></audio>
 <canvas id="canvas"></canvas>
 <div id="text-container">
   <h1>My Perfect One</h1>
@@ -146,12 +146,13 @@ const dust = Array.from({length: 160}, () => ({
 
 let started = false, t0 = 0;
 const audio = document.getElementById('bgMusic');
-const CLIP_START = 0;    // mp3 ichidan qaysi soniyadan boshlash (masalan 38 — "I found a love..." qismi)
+const CLIP_START = 61;   // 01:01 dan boshlanadi (fayl bundan qisqa bo'lsa, avtomatik 0 dan boshlanadi)
+let clipStart = CLIP_START;
 const CLIP_LEN = 15;     // necha soniya chalinsin
 const FADE = 3;          // oxirgi soniyalarda sekin pasayadi
 function updateMusic(){
   if (audio.paused) return;
-  const t = audio.currentTime - CLIP_START;
+  const t = audio.currentTime - clipStart;
   if (t >= CLIP_LEN){ audio.pause(); return; }
   audio.volume = Math.max(0, Math.min(1, t / 1.5, (CLIP_LEN - t) / FADE));
 }
@@ -226,9 +227,13 @@ function frame(now){
 requestAnimationFrame(frame);
 
 document.getElementById('start-screen').addEventListener('click', function(){
-  try { audio.currentTime = CLIP_START; } catch(e){}
   audio.volume = 0;
   audio.play().catch(e => console.log('Musiqa xatosi:', e));
+  const seek = () => {
+    clipStart = (isFinite(audio.duration) && audio.duration > CLIP_START + CLIP_LEN) ? CLIP_START : 0;
+    try { audio.currentTime = clipStart; } catch(e){}
+  };
+  if (audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek, {once: true});
   this.style.opacity = '0';
   setTimeout(() => this.style.display = 'none', 1000);
   t0 = performance.now();
