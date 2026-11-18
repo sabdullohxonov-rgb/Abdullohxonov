@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Siz uchun maxsus</title>
+<style>
+  body{margin:0;background:#050510;overflow:hidden;font-family:'Courier New',monospace}
+  #canvas{display:block}
+  #start-screen{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;background:#050510;z-index:10;cursor:pointer;color:#66b3ff;font-family:sans-serif;transition:opacity 1s ease}
+  #start-screen h2{font-size:2rem;animation:pulse 2s infinite}
+  @keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.1);opacity:.6}100%{transform:scale(1);opacity:1}}
+  #text-container{position:absolute;top:12%;left:50%;transform:translate(-50%,-50%);color:#fff;text-align:center;opacity:0;transition:opacity 4s ease-in-out;pointer-events:none;width:100%}
+  #text-container h1{font-size:3rem;margin:0 0 10px;color:#66b3ff;letter-spacing:3px;text-shadow:0 0 15px rgba(102,179,255,.7)}
+  #text-container p{font-size:1.3rem;color:#b3d9ff;font-style:italic;margin:0}
+  @media(max-width:600px){#text-container h1{font-size:2rem}#text-container p{font-size:1rem}}
+</style>
+</head>
+<body>
+<div id="start-screen"><h2>Ekranni bosing 💙</h2></div>
+<!-- Ed Sheeran - Perfect mp3 faylini shu index.html yoniga perfect.mp3 nomi bilan qo'ying. Faqat 15 soniya chalinadi -->
+<audio id="bgMusic" preload="auto"><source src="perfect.mp3" type="audio/mpeg"></audio>
+<canvas id="canvas"></canvas>
+<div id="text-container">
+  <h1>My Perfect One</h1>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, S;
+function resize(){
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  S = Math.min(W, H * 1.05) / 560;
+}
+resize();
+addEventListener('resize', resize);
+
+// Orqa fondagi yulduzlar
+const stars = Array.from({length: 200}, () => ({
+  x: Math.random(), y: Math.random(), size: Math.random() * 1.5, alpha: Math.random()
+}));
+
+// ---------- Zarrachalardan atirgul ----------
+const PETAL = [[0,10,60],[0,40,140],[10,80,255],[40,130,255],[90,170,255],[150,205,255],[215,236,255]];
+function petalColor(t){ // t: 0 (markaz, to'q) -> 1 (chet, och)
+  const f = Math.min(0.999, Math.max(0, t)) * (PETAL.length - 1);
+  const i = Math.floor(f), k = f - i;
+  return PETAL[i].map((v, n) => v + (PETAL[i+1][n] - v) * k);
+}
+
+const particles = [];
+function add(tx, ty, tz, col, size, delay){
+  const a = Math.random() * Math.PI * 2, r = 250 + Math.random() * 500;
+  particles.push({
+    tx, ty, tz, col, size, delay,
+    sx: Math.cos(a) * r, sy: (Math.random() - 0.5) * 700, sz: Math.sin(a) * r,
+    tw: Math.random() * 6.28
+  });
+}
+
+// Gul boshi: "Go'zal va maxluq" atirgulidek — yopiq g'uncha, atrofida sekin ochilgan gulbarglar
+const LAYERS = 8;
+const lay = [];
+for (let k = 0; k < LAYERS; k++){
+  const o = Math.pow(k / (LAYERS - 1), 1.3) * 0.62;       // ichkarisi yopiq, tashqarisi biroz ochiq
+  const n = [3, 3, 4, 5, 5, 6, 6, 7][k];
+  const rb = 3 + k * 6, L = 75 + k * 8, yb = -4 + k * 5;
+  const Wk = Math.PI * (rb + L * 0.3) / n * (k < 3 ? 1.9 : 1.5);   // ichki gulbarglar g'unchani o'rab oladi
+  lay.push({k, o, n, rb, L, yb, Wk, area: L * Wk * n});
+}
+const AREA = lay.reduce((a, l) => a + l.area, 0);
+const PETAL_N = 8000;
+for (const l of lay){
+  const cnt = Math.round(PETAL_N * l.area / AREA);
+  for (let i = 0; i < cnt; i++){
+    const pi = Math.floor(Math.random() * l.n);
+    const phi = pi / l.n * Math.PI * 2 + l.k * 2.4;
+    const edge = Math.random() < 0.2;
+    const u = edge && Math.random() < 0.5 ? Math.random() : Math.pow(Math.random(), 0.85);
+    const w = l.Wk * Math.pow(Math.sin(Math.PI * Math.pow(u, 0.7)), 0.5);
+    const v = edge ? (Math.random() < 0.5 ? -1 : 1) * (0.94 + Math.random() * 0.06) : Math.random() * 2 - 1;
+    const rad = l.rb + l.L * (l.o * 0.55 * u + (0.10 + 0.30 * l.o) * u * u);
+    const ang = phi + (v * w) / Math.max(rad, 24);
+    // uchi tashqariga qayrilgan (gulbarg "lab"i) va yon tomonlari ko'tarilgan
+    const curl = u > 0.8 ? (u - 0.8) / 0.2 : 0;
+    const y = l.yb - l.L * (0.95 * u - 0.9 * l.o * u * u)
+              + Math.sin(v * 2.5 + l.k) * 1.8 * u
+              - curl * curl * 4 * (1 - l.o)
+              + v * v * w * 0.08;
+    const r2 = rad + curl * curl * 5 * (0.4 + l.o) + (Math.random() - 0.5) * 1.4;
+    const tt = 0.06 + 0.5 * u + 0.28 * (l.k / (LAYERS - 1)) + (edge ? 0.2 : 0) + (Math.random() - 0.5) * 0.06;
+    add(Math.cos(ang) * r2, y, Math.sin(ang) * r2, petalColor(tt),
+        1.5 + Math.random() * 1.1, l.k / LAYERS * 0.4 + u * 0.15);
+  }
+}
+
+// Kosacha barglari (g'uncha ostida pastga egilgan)
+for (let m = 0; m < 5; m++){
+  const phi = m / 5 * Math.PI * 2 + 0.4;
+  for (let i = 0; i < 160; i++){
+    const u = Math.random(), v = Math.random() * 2 - 1;
+    const w = 9 * Math.sin(Math.PI * Math.pow(u, 0.8));
+    const rad = 14 + u * 55, y = 34 + u * 22 - Math.sin(u * 3) * 10;
+    const ang = phi + v * w / Math.max(rad, 20);
+    add(Math.cos(ang) * rad, y, Math.sin(ang) * rad, [20 + Math.random()*25, 110 + Math.random()*50, 75 + Math.random()*40], 1.2 + Math.random(), 0.45 + u * 0.1);
+  }
+}
+
+// Poya
+for (let i = 0; i < 1800; i++){
+  const s = Math.random();
+  const y = 32 + s * 360;
+  const x = Math.sin(s * 2.4) * 22;
+  const a = Math.random() * 6.28, r = 4.5 * (1 - s * 0.2);
+  add(x + Math.cos(a) * r, y, Math.sin(a) * r,
+      [20 + Math.random()*30, 110 + Math.random()*60, 70 + Math.random()*40], 1 + Math.random() * 1.1, 0.5 + s * 0.15);
+}
+
+// Barglar
+function leaf(sy, dir, len, wid){
+  for (let i = 0; i < 700; i++){
+    const u = Math.random(), v = (Math.random() * 2 - 1);
+    const w = Math.sin(u * Math.PI) * wid;
+    const x = Math.sin(sy / 360 * 2.4) * 22 + dir * u * len;
+    const y = sy - u * 40 + Math.abs(v) * w * 0.35;
+    add(x, y, v * w, [15 + Math.random()*30, 100 + Math.random()*70, 80 + Math.random()*50], 1 + Math.random(), 0.65 + u * 0.1);
+  }
+}
+// Tikanlar
+[[110, 1], [190, -1], [250, 1]].forEach(([ty, d]) => {
+  for (let i = 0; i < 40; i++){
+    const u = Math.random(), x = Math.sin(((ty - 32) / 360) * 2.4) * 22;
+    add(x + d * u * 14, ty - u * 14, (Math.random() - 0.5) * 3 * (1 - u), [30, 130, 80], 1.1, 0.55);
+  }
+});
+leaf(210, -1, 120, 30);
+leaf(290, 1, 130, 32);
+
+// Atrofda suzuvchi mayda zarralar
+const dust = Array.from({length: 160}, () => ({
+  x: (Math.random() - 0.5) * 700, y: (Math.random() - 0.5) * 800, z: (Math.random() - 0.5) * 500,
+  v: 0.1 + Math.random() * 0.3, p: Math.random() * 6.28
+}));
+
+let started = false, t0 = 0;
+const audio = document.getElementById('bgMusic');
+const CLIP_START = 0;    // mp3 ichidan qaysi soniyadan boshlash (masalan 38 — "I found a love..." qismi)
+const CLIP_LEN = 15;     // necha soniya chalinsin
+const FADE = 3;          // oxirgi soniyalarda sekin pasayadi
+function updateMusic(){
+  if (audio.paused) return;
+  const t = audio.currentTime - CLIP_START;
+  if (t >= CLIP_LEN){ audio.pause(); return; }
+  audio.volume = Math.max(0, Math.min(1, t / 1.5, (CLIP_LEN - t) / FADE));
+}
+const ease = x => x < 0 ? 0 : x > 1 ? 1 : 1 - Math.pow(1 - x, 3);
+const BLOOM = 7500; // ms
+
+function frame(now){
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, W, H);
+
+  stars.forEach(s => {
+    ctx.fillStyle = `rgba(150,200,255,${s.alpha})`;
+    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.size, 0, 6.283); ctx.fill();
+    s.alpha = Math.min(1, Math.max(0, s.alpha + (Math.random() - 0.5) * 0.03));
+  });
+
+  if (started){
+    const el = now - t0;
+    const p = Math.min(1, el / BLOOM);
+    const rotY = el * 0.00028, cy = Math.cos(rotY), sy = Math.sin(rotY);
+    const tilt = 0.55, ct = Math.cos(tilt), st = Math.sin(tilt);
+    const cx0 = W / 2, cy0 = H * 0.42;
+
+    // gul orqasidagi yumshoq nur
+    const g = ctx.createRadialGradient(cx0, cy0, 10, cx0, cy0, 260 * S);
+    g.addColorStop(0, `rgba(50,120,255,${0.32 * p})`); g.addColorStop(1, 'rgba(40,110,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    for (const q of particles){
+      const k = ease((p - q.delay * 0.55) / 0.45);
+      let x = q.sx + (q.tx - q.sx) * k;
+      let y = q.sy + (q.ty - q.sy) * k;
+      let z = q.sz + (q.tz - q.sz) * k;
+      const br = 1 + Math.sin(el * 0.0016 + q.tw) * 0.006 * k;
+      x *= br; z *= br;
+      const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+      const y2 = y * ct - z1 * st, z2 = y * st + z1 * ct;
+      const persp = 700 / (700 + z2);
+      q.px = cx0 + x1 * persp * S; q.py = cy0 + y2 * persp * S;
+      q.pz = z2; q.pp = persp; q.k = k;
+    }
+    particles.sort((m, n) => n.pz - m.pz);               // uzoqdagilar avval
+    ctx.globalCompositeOperation = 'source-over';
+    for (const q of particles){
+      const depth = 0.6 + 0.4 * Math.min(1, Math.max(0, (160 - q.pz) / 320));
+      const tw = 0.9 + 0.1 * Math.sin(el * 0.004 + q.tw);
+      const a = (0.3 + 0.7 * q.k) * tw;
+      const c = q.col;
+      ctx.fillStyle = `rgba(${c[0] * depth | 0},${c[1] * depth | 0},${c[2] * depth | 0},${a})`;
+      const sz = q.size * q.pp * S * 1.2;
+      ctx.fillRect(q.px, q.py, sz, sz);
+    }
+    ctx.globalCompositeOperation = 'lighter';
+
+    // suzuvchi nurli zarralar
+    for (const d of dust){
+      d.y -= d.v; if (d.y < -400) d.y = 400;
+      let x1 = d.x * cy + d.z * sy, z1 = -d.x * sy + d.z * cy;
+      let y2 = d.y * ct - z1 * st, z2 = d.y * st + z1 * ct;
+      const persp = 700 / (700 + z2);
+      ctx.fillStyle = `rgba(140,200,255,${(0.25 + 0.25 * Math.sin(el * 0.003 + d.p)) * p})`;
+      ctx.beginPath(); ctx.arc(cx0 + x1 * persp * S, cy0 + y2 * persp * S, 1.4, 0, 6.283); ctx.fill();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    updateMusic();
+    if (p >= 1) document.getElementById('text-container').style.opacity = 1;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+document.getElementById('start-screen').addEventListener('click', function(){
+  try { audio.currentTime = CLIP_START; } catch(e){}
+  audio.volume = 0;
+  audio.play().catch(e => console.log('Musiqa xatosi:', e));
+  this.style.opacity = '0';
+  setTimeout(() => this.style.display = 'none', 1000);
+  t0 = performance.now();
+  started = true;
+});
+</script>
+</body>
+</html>
